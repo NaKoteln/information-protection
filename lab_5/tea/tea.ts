@@ -1,3 +1,5 @@
+import * as readline from 'readline';
+
 // Размер блока данных, который обрабатывается за один раз (8 байт)
 const BLOCK_SIZE = 8;
 // Количество раундов для шифрования TEA
@@ -172,15 +174,83 @@ function padBlock(block: Buffer): Buffer {
   return padded;
 }
 
-// Пример входных данных для шифрования и дешифрования
-const message = 'Тестовое сообщение';
-// Пример ключа для шифрования
-const key = Buffer.from('0123456789ABCDEF0123456789ABCDEF', 'hex');
+/**
+ * Запуск тестового примера.
+ */
+function runTests() {
+  console.log('*** Тест алгоритма TEA ***');
 
-// Шифруем сообщение
-const encryptedMessage = encrypt(message, key);
-console.log("Зашифрованное сообщение (hex):", encryptedMessage);
+  const message = 'Тестовое сообщение';
+  const key = Buffer.from('0123456789ABCDEF0123456789ABCDEF', 'hex');
 
-// Дешифруем сообщение
-const decryptedMessage = decrypt(encryptedMessage, key);
-console.log("Расшифрованное сообщение:", decryptedMessage);
+  console.log('\nИсходное сообщение:', message);
+  console.log('Ключ:', key.toString('hex'));
+
+  // Шифрование
+  const encryptedMessage = encrypt(message, key);
+  console.log('Зашифрованное сообщение (hex):', encryptedMessage);
+
+  // Дешифрование
+  const decryptedMessage = decrypt(encryptedMessage, key);
+  console.log('Расшифрованное сообщение:', decryptedMessage);
+
+  console.log('*** Завершение тестов ***\n');
+}
+
+/**
+* Интерфейс взаимодействия с пользователем для шифрования и дешифрования.
+*/
+async function runCipherInterface() {
+  const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+  });
+
+  const question = (query: string): Promise<string> =>
+      new Promise(resolve => rl.question(query, resolve));
+
+  console.log('*** TEA Шифратор/Дешифратор ***');
+  console.log('Для выхода введите команду "exit".\n');
+
+  while (true) {
+      try {
+          const message = await question('Введите сообщение для шифрования (или "exit" для выхода): ');
+          if (message.toLowerCase() === 'exit') break;
+
+          const keyInput = await question('Введите 16-байтовый ключ (в hex формате, или "exit" для выхода): ');
+          if (keyInput.toLowerCase() === 'exit') break;
+
+          if (keyInput.length !== 32) {
+              console.log('Ошибка: ключ должен быть 16 байт (32 символа в hex формате). Попробуйте снова.\n');
+              continue;
+          }
+
+          const key = Buffer.from(keyInput, 'hex');
+
+          // Шифрование
+          const encryptedMessage = encrypt(message, key);
+          console.log('Зашифрованное сообщение (hex):', encryptedMessage);
+
+          // Дешифрование
+          const decryptedMessage = decrypt(encryptedMessage, key);
+          console.log('Расшифрованное сообщение:', decryptedMessage, '\n');
+      } catch (error) {
+          console.error('Произошла ошибка:', error.message);
+      }
+  }
+
+  console.log('*** Завершение работы программы ***');
+  rl.close();
+}
+
+/**
+* Основная функция программы.
+* Сначала выполняются тесты, затем запускается пользовательский интерфейс.
+*/
+async function main() {
+  runTests(); // Запуск тестов
+  await runCipherInterface(); // Запуск пользовательского интерфейса
+}
+
+// Запуск программы
+main();
