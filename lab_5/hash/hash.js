@@ -44,8 +44,8 @@ function addPadding(block) {
  * key - ключ для шифрования
  */
 function applyTEA(block, key) {
-    var keyParts = getKeyParts(key);
-    var textBlockParts = divideTextBlock(block);
+    var keyParts = extractKeyParts(key);
+    var textBlockParts = splitBlock(block);
     var sum = 0;
     // Выполнения 32-х раундов шифрования TEA
     for (var i = 0; i < ROUNDS; i++) {
@@ -61,7 +61,7 @@ function applyTEA(block, key) {
 /**
  * Делим 16-байтовый ключ на 4 части по 32 бита.
  */
-function getKeyParts(key) {
+function extractKeyParts(key) {
     return [
         key.readUInt32BE(0),
         key.readUInt32BE(4),
@@ -72,7 +72,7 @@ function getKeyParts(key) {
 /**
  * Разделяем 8-байтовый блок данных на 2 части по 32 бита.
  */
-function divideTextBlock(block) {
+function splitBlock(block) {
     return [
         block.readUInt32BE(0),
         block.readUInt32BE(4)
