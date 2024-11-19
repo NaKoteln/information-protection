@@ -1,3 +1,6 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var readline = require("readline");
 // Размер блока для обработки данных (8 байт = 64 бита)
 var BLOCK_SIZE = 8;
 // Количество раундов для шифрования TEA
@@ -94,11 +97,61 @@ function intArrayToByteArray(intArray) {
     // Возврат массива байтов из буфера
     return Array.from(buffer);
 }
-// Пример входных данных для хеширования
-var inputText = "Тестовое сообщение";
-// Пример ключа для шифрования
-var key = Buffer.from('0123456789ABCDEF0123456789ABCDEF', 'hex');
-// Получаем хеш строки с помощью функции hash
-var hashed = hash(inputText, key);
-// Выводим результат хеширования
-console.log("Хеш:", hashed);
+// Запуск тестов
+function runTests() {
+    var inputText = "Тестовое сообщение";
+    var key = Buffer.from('0123456789ABCDEF0123456789ABCDEF', 'hex');
+    console.log("\n*** Тестовые данные ***");
+    var hashedOriginal = hash(inputText, key);
+    console.log("Исходный текст:", inputText);
+    console.log("Исходный хеш:", hashedOriginal);
+    var alteredText = "Тестовый сообщение";
+    var hashedAlteredText = hash(alteredText, key);
+    console.log("\nИзменённый текст:", alteredText);
+    console.log("Хеш изменённого текста:", hashedAlteredText);
+    var alteredKey = Buffer.from('0123456789ABCDEF0123456789ABCDEE', 'hex');
+    var hashedAlteredKey = hash(inputText, alteredKey);
+    console.log("\nИзменённый ключ:", alteredKey.toString('hex'));
+    console.log("Хеш с изменённым ключом:", hashedAlteredKey);
+}
+// Взаимодействие с пользвателем
+function userInteraction() {
+    console.log("\n*** Ввод от пользователя ***");
+    var rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    function askForInput() {
+        rl.question("\nВведите строку для хеширования (или 'exit' для выхода): ", function (inputText) {
+            if (inputText.toLowerCase() === 'exit') {
+                console.log("Выход из программы.");
+                rl.close();
+                return;
+            }
+            rl.question("Введите ключ (в формате hex, 16 байт, или 'exit' для выхода): ", function (keyHex) {
+                if (keyHex.toLowerCase() === 'exit') {
+                    console.log("Выход из программы.");
+                    rl.close();
+                    return;
+                }
+                try {
+                    var key = Buffer.from(keyHex, 'hex');
+                    if (key.length !== 16) {
+                        throw new Error("Ключ должен быть длиной 16 байт!");
+                    }
+                    var hashed = hash(inputText, key);
+                    console.log("\nХеш введённой строки:", hashed);
+                }
+                catch (err) {
+                    console.error("Ошибка:", err.message);
+                }
+                finally {
+                    askForInput(); // Повторяем запрос после завершения текущего.
+                }
+            });
+        });
+    }
+    askForInput();
+}
+runTests();
+userInteraction();
