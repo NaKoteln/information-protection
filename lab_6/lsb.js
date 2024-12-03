@@ -42,33 +42,35 @@ rl.question('Enter your secret message: ', (secretMessage) => {
     rl.close();
 });
 
-// Функция для кодирования изображения с скрытым сообщением
-async function encodeImageToPNG(inputPath, message, outputPath, endMarker) {
+// Функция для кодирования изображения с длиной сообщения
+async function encodeImageToPNG(inputPath, message, outputPath) {
     try {
-        // Чтение исходного изображения в формате PNG
         const imageBuffer = await fs.promises.readFile(inputPath);
         const image = PNG.sync.read(imageBuffer);
 
-        // Преобразуем сообщение в бинарный массив и добавляем маркер конца
-        const binaryMessage = textToBinaryArray(message + endMarker);
-        let messageIndex = 0;
+        // Преобразуем сообщение в бинарный массив
+        const binaryMessage = textToBinaryArray(message);
 
-        // Получаем данные пикселей изображения
+        // Кодируем длину сообщения в первых пикселях
+        const messageLength = binaryMessage.length;
+        const lengthInBytes = messageLength.toString(2).padStart(32, '0'); // Длина сообщения (32 бита)
+        const binaryMessageWithLength = lengthInBytes.split('').map(Number).concat(binaryMessage);
+
+        let messageIndex = 0;
         const pixelData = Array.from(image.data);
 
-        // Проходим по пикселям изображения и вставляем скрытое сообщение
+        // Процесс кодирования
         for (let i = 0; i < pixelData.length; i += 4) {
             const pixel = pixelData.slice(i, i + 4);
-            if (messageIndex < binaryMessage.length) {
-                const messageFragment = binaryMessage.slice(messageIndex, messageIndex + 4);
-                // Вставляем фрагмент сообщения в пиксель
+            if (messageIndex < binaryMessageWithLength.length) {
+                const messageFragment = binaryMessageWithLength.slice(messageIndex, messageIndex + 4);
                 const updatedPixel = insertMessageIntoPixel(pixel, messageFragment);
                 updatedPixel.forEach((newValue, j) => {
                     pixelData[i + j] = newValue;
                 });
                 messageIndex += 4;
             } else {
-                // Если сообщение закончилось, вставляем шум в пиксели
+                // Заполнение случайными данными после завершения сообщения
                 const randomNoise = Array.from({ length: 4 }, () => Math.round(Math.random()));
                 const updatedPixel = insertMessageIntoPixel(pixel, randomNoise);
                 updatedPixel.forEach((newValue, j) => {
@@ -77,14 +79,9 @@ async function encodeImageToPNG(inputPath, message, outputPath, endMarker) {
             }
         }
 
-        // Создаем новое изображение с обновленными данными пикселей
-        const newImage = new PNG({
-            width: image.width,
-            height: image.height,
-        });
+        const newImage = new PNG({ width: image.width, height: image.height });
         newImage.data = Buffer.from(pixelData);
 
-        // Записываем измененное изображение в файл
         const buffer = PNG.sync.write(newImage);
         await fs.promises.writeFile(outputPath, buffer);
     } catch (err) {
@@ -93,24 +90,27 @@ async function encodeImageToPNG(inputPath, message, outputPath, endMarker) {
     }
 }
 
-// Функция для декодирования изображения и извлечения скрытого сообщения
-async function decodeImageFromPNG(imagePath, endMarker) {
+// Функция для декодирования изображения с извлечением длины сообщения
+async function decodeImageFromPNG(imagePath) {
     try {
-        // Чтение изображения из файла
         const imageBuffer = await fs.promises.readFile(imagePath);
         const image = PNG.sync.read(imageBuffer);
 
-        // Массив для хранения извлеченных данных
         const extractedData = [];
         for (let i = 0; i < image.data.length; i += 4) {
             const pixel = Array.from(image.data.slice(i, i + 4));
-            // Извлекаем биты сообщения из пикселей
             const dataFragment = extractMessageFromPixel(pixel);
             extractedData.push(...dataFragment);
         }
 
-        // Преобразуем бинарные данные обратно в текст, заканчивая на маркере
-        return binaryArrayToText(extractedData, endMarker);
+        // Извлекаем длину сообщения из первых 32 бит
+        const messageLengthBinary = extractedData.slice(0, 32);
+        const messageLength = parseInt(messageLengthBinary.join(''), 2);
+
+        // Извлекаем само сообщение, начиная с 33 бита
+        const messageBinary = extractedData.slice(32, 32 + messageLength);
+
+        return binaryArrayToText(messageBinary);
     } catch (err) {
         console.error('Error processing image:', err.message);
         throw err;
@@ -134,7 +134,6 @@ function textToBinaryArray(text) {
     const binaryArray = [];
     for (const char of text) {
         const binaryString = char.charCodeAt(0).toString(2).padStart(8, '0');
-        // Преобразуем каждый символ в массив бит
         for (const bit of binaryString) {
             binaryArray.push(Number(bit));
         }
@@ -143,19 +142,13 @@ function textToBinaryArray(text) {
 }
 
 // Функция для преобразования бинарного массива обратно в текст
-function binaryArrayToText(binaryArray, endMarker) {
+function binaryArrayToText(binaryArray) {
     let decodedText = '';
     let index = 0;
-    // Читаем биты по 8 и преобразуем их в символы
     while (index + 8 <= binaryArray.length) {
         const binarySegment = binaryArray.slice(index, index + 8).join('');
         decodedText += String.fromCharCode(parseInt(binarySegment, 2));
         index += 8;
-        // Проверяем, не достигли ли конца скрытого сообщения
-        if (decodedText.endsWith(endMarker)) {
-            break;
-        }
     }
-    // Убираем маркер из конца сообщения
-    return decodedText.slice(0, -endMarker.length);
+    return decodedText;
 }
